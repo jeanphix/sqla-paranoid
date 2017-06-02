@@ -15,6 +15,9 @@ with open('README.rst', 'r') as f:
         install_requires=[
           'sqlalchemy',
         ],
+        tests_require=[
+          'psycopg2',
+        ],
         test_suite="paranoid.tests",
         license='MIT',
     )
