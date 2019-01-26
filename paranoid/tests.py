@@ -142,7 +142,7 @@ class QueryTest(TestCase):
         query = session.query(User).filter(User.id == self.deleted.id)
         statement = str(query)
         self.assertTrue(statement.endswith(
-            'WHERE "user".deleted_at IS NULL AND "user".id = %(id_1)s'
+            'WHERE user.deleted_at IS NULL AND user.id = ?'
         ))
         self.assertRaises(NoResultFound, query.one)
 
@@ -169,7 +169,7 @@ class QueryTest(TestCase):
         ).filter(Group.id == self.admins.id)
         statement = str(query)
         self.assertIn(
-            ' LEFT OUTER JOIN (user_group AS user_group_1 JOIN "user" AS user_1 '
+            ' LEFT OUTER JOIN (user_group AS user_group_1 JOIN user AS user_1 '
             'ON user_1.id = user_group_1.user_id '
             'AND user_1.deleted_at IS NULL)',
             statement,
