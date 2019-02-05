@@ -132,8 +132,18 @@ class SessionTest(TestCase):
     def test_delete(self):
         alive = self.alive
         self.assertTrue(alive.deleted_at is None)
-        self.session.delete(alive)
+        session = self.session
+        session.delete(alive)
         self.assertTrue(alive.deleted_at is not None)
+        session.flush()
+        self.assertFalse(alive._sa_instance_state.was_deleted)
+
+    def test_delete_hard(self):
+        alive = self.alive
+        session = self.session
+        session.delete(alive, hard=True)
+        session.flush()
+        self.assertTrue(alive._sa_instance_state.was_deleted)
 
 
 class QueryTest(TestCase):

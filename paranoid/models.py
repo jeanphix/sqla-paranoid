@@ -80,8 +80,8 @@ Query = query_factory(SqlaQuery)
 
 def session_factory(BaseSesion):
     class Session(BaseSesion):
-        def delete(self, obj):
-            if hasattr(obj, '__softdelete__') and obj.__softdelete__:
+        def delete(self, obj, hard=False):
+            if not hard and hasattr(obj, '__softdelete__') and obj.__softdelete__:
                 obj.deleted_at = datetime.utcnow()
                 return True
 
