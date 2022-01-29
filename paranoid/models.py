@@ -22,8 +22,6 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.relationships import RelationshipProperty
 from sqlalchemy.sql.expression import BinaryExpression
 
-from sqlalchemy.sql.base import _generative
-
 logger = logging.getLogger('paranoid')
 
 
@@ -36,7 +34,7 @@ class Mapper(BaseMapper):
 
 
 def query_factory(BaseQuery):
-    class Query(BaseQuery):
+    class QueryWithSoftDelete(BaseQuery):
         # This allows softdelete passive criterion for few
         # methods such as `get` or `select_from`.
         _enable_assertions = False
@@ -47,10 +45,10 @@ def query_factory(BaseQuery):
             super().__init__(*entities, **kw)
 
         def __new__(cls, *entities, **kw):
-            query = super(Query, cls).__new__(cls)
+            query = super(QueryWithSoftDelete, cls).__new__(cls)
             query._with_deleted = kw.pop('_with_deleted', False)
 
-            super(Query, query).__init__(entities, kw)
+            super(QueryWithSoftDelete, query).__init__(entities, kw)
 
             query.__entities = entities
             query.__class__ = cls
@@ -84,7 +82,18 @@ def query_factory(BaseQuery):
             return self.__class__(self._only_full_mapper_zero('get'),
                                   session=self.session, _with_deleted=True)
 
-    return Query
+        def _get(self, *args, **kwargs):
+            # this calls the original query.get function from the base class
+            return super(QueryWithSoftDelete, self).get(*args, **kwargs)
+
+        def get(self, *args, **kwargs):
+            # the query.get method does not like it if there is a filter clause
+            # pre-loaded, so we need to implement it using a workaround
+            obj = self.with_deleted()._get(*args, **kwargs)
+            return obj if obj is None or self._with_deleted or obj.deleted_at is None else None
+
+
+    return QueryWithSoftDelete
 
 
 Query = query_factory(SqlaQuery)
