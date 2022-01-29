@@ -22,6 +22,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.relationships import RelationshipProperty
 from sqlalchemy.sql.expression import BinaryExpression
 
+from sqlalchemy.sql.base import _generative
 
 logger = logging.getLogger('paranoid')
 
@@ -39,17 +40,24 @@ def query_factory(BaseQuery):
         # This allows softdelete passive criterion for few
         # methods such as `get` or `select_from`.
         _enable_assertions = False
+        _with_deleted = False
+
+        def __init__(self, *entities, **kw):
+            self._with_deleted = kw.pop('_with_deleted', False)
+            super().__init__(*entities, **kw)
 
         def __new__(cls, *entities, **kw):
-            if entities:
-                query = parent = BaseQuery(*entities, **kw)
-            else:
-                query = parent = BaseQuery.__new__(BaseQuery, **kw)
+            query = super(Query, cls).__new__(cls)
+            query._with_deleted = kw.pop('_with_deleted', False)
+
+            super(Query, query).__init__(entities, kw)
 
             query.__entities = entities
-            query.__parent__ = parent
             query.__class__ = cls
-            query = query.restrict()
+
+            if not query._with_deleted:
+                query = query.restrict()
+
             return query
 
         def restrict(self):
@@ -71,6 +79,10 @@ def query_factory(BaseQuery):
                     query._soft_delete = deleted_at
 
             return query
+
+        def with_deleted(self):
+            return self.__class__(self._only_full_mapper_zero('get'),
+                                  session=self.session, _with_deleted=True)
 
     return Query
 
@@ -119,6 +131,11 @@ def model_factory(BaseModel=BaseModel):
 
         def delete(self):
             logger.info("deleting %r" % self)
+            self.deleted_at = datetime.now()
+
+        def restore(self):
+            logger.info("restoring %r" % self)
+            self.deleted_at = None
 
         @declared_attr
         def __mapper_cls__(cls):
