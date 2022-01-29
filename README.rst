@@ -51,7 +51,7 @@ Usage
     # query for a soft deleted user
     user = User.query.with_deleted().get(1)
     # or
-    user = User.query.with_deleted().filter_by(id=1)
+    user = User.query.with_deleted().filter_by(id=1).first()
 
     # restore the user (undo soft delete)
     user.restore()
