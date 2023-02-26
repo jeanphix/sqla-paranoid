@@ -30,7 +30,7 @@ class Mapper(BaseMapper):
         if isinstance(prop, RelationshipProperty):
             prop.query_class = Query
 
-        super()._configure_property(key, prop, init, setparent)
+        super()._configure_property(key, prop, init=init, setparent=setparent)
 
 
 def query_factory(BaseQuery):
