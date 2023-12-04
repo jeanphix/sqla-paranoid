@@ -1,7 +1,9 @@
 Paranoid
 ========
 
-Brings transparent soft delete to SQLAlchemy ORM.
+Brings transparent soft delete to SQLAlchemy ORM. This branch has been
+modified to add the with_deleted() and restore() methods for interacting
+with soft-deleted resources.
 
 .. image:: https://travis-ci.org/jeanphix/sqla-paranoid.svg?branch=dev
    :target: https://travis-ci.org/jeanphix/sqla-paranoid
@@ -40,6 +42,28 @@ Usage
 
     session.query(User)
 
+    # retrieve a user that has not been deleted (assuming ID is 1)
+    user = User.query.get(1)
+
+    # soft delete the user
+    user.delete()
+
+    # query for a soft deleted user
+    user = User.query.with_deleted().get(1)
+    # or
+    user = User.query.with_deleted().filter_by(id=1).first()
+
+    # restore the user (undo soft delete)
+    user.restore()
+
+    # save the changes
+    session.add(user)
+    session.commit()
+
+    # hard delete the user
+    session.delete(user, hard=True)
+    session.commit()
+
 
 Flask
 -----
@@ -54,6 +78,9 @@ on top of Flask-SQLAlchemy:
 
 
     db = SQLAlchemy(app)
+    # or you can use the factory style of initialisation
+    db = SQLAlchemy()
+    db.init_app(app)
 
     Model = db.Model
 

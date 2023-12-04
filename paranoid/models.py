@@ -4,6 +4,7 @@ import operator
 import weakref
 
 from datetime import datetime
+from typing import Union, Any
 
 from sqlalchemy import (
     Column,
@@ -17,39 +18,54 @@ from sqlalchemy.ext.declarative import (
 from sqlalchemy.orm import (
     Mapper as BaseMapper,
     Query as SqlaQuery,
-    Session as SqlaSession,
+    Session as SqlaSession, MapperProperty,
 )
 from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.sql.elements import KeyedColumnElement
 from sqlalchemy.sql.expression import BinaryExpression
-
 
 logger = logging.getLogger('paranoid')
 
 
 class Mapper(BaseMapper):
-    def _configure_property(self, key, prop, init=True, setparent=True):
-        if isinstance(prop, RelationshipProperty):
-            prop.query_class = Query
+    def _configure_property(
+            self,
+            key: str,
+            prop_arg: Union[KeyedColumnElement[Any], MapperProperty[Any]],
+            *,
+            init: bool = True,
+            setparent: bool = True,
+            warn_for_existing: bool = False
+    ):
+        if isinstance(prop_arg, RelationshipProperty):
+            prop_arg.query_class = Query
 
-        super()._configure_property(key, prop, init, setparent)
+        super()._configure_property(key, prop_arg, init=init, setparent=setparent, warn_for_existing=warn_for_existing)
 
 
 def query_factory(BaseQuery):
-    class Query(BaseQuery):
+    class QueryWithSoftDelete(BaseQuery):
         # This allows softdelete passive criterion for few
         # methods such as `get` or `select_from`.
         _enable_assertions = False
+        _with_deleted = False
+
+        def __init__(self, *entities, **kw):
+            self._with_deleted = kw.pop('_with_deleted', False)
+            super().__init__(*entities, **kw)
 
         def __new__(cls, *entities, **kw):
-            if entities:
-                query = parent = BaseQuery(*entities, **kw)
-            else:
-                query = parent = BaseQuery.__new__(BaseQuery, **kw)
+            query = super(QueryWithSoftDelete, cls).__new__(cls)
+            query._with_deleted = kw.pop('_with_deleted', False)
+
+            super(QueryWithSoftDelete, query).__init__(entities, kw)
 
             query.__entities = entities
-            query.__parent__ = parent
             query.__class__ = cls
-            query = query.restrict()
+
+            if not query._with_deleted:
+                query = query.restrict()
+
             return query
 
         def restrict(self):
@@ -72,7 +88,21 @@ def query_factory(BaseQuery):
 
             return query
 
-    return Query
+        def with_deleted(self):
+            return self.__class__(self._only_full_mapper_zero('get'),
+                                  session=self.session, _with_deleted=True)
+
+        def _get(self, *args, **kwargs):
+            # this calls the original query.get function from the base class
+            return super(QueryWithSoftDelete, self).get(*args, **kwargs)
+
+        def get(self, *args, **kwargs):
+            # the query.get method does not like it if there is a filter clause
+            # pre-loaded, so we need to implement it using a workaround
+            obj = self.with_deleted()._get(*args, **kwargs)
+            return obj if obj is None or self._with_deleted or obj.deleted_at is None else None
+
+    return QueryWithSoftDelete
 
 
 Query = query_factory(SqlaQuery)
@@ -119,6 +149,11 @@ def model_factory(BaseModel=BaseModel):
 
         def delete(self):
             logger.info("deleting %r" % self)
+            self.deleted_at = datetime.now()
+
+        def restore(self):
+            logger.info("restoring %r" % self)
+            self.deleted_at = None
 
         @declared_attr
         def __mapper_cls__(cls):

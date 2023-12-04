@@ -14,6 +14,7 @@ with open('README.rst', 'r') as f:
         zip_safe=False,
         install_requires=[
           'sqlalchemy',
+          'Flask-SQLAlchemy',
         ],
         tests_require=[
           'psycopg2',

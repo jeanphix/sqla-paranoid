@@ -1,9 +1,8 @@
-from flask_sqlalchemy import (
-    Model as BaseModel,
-    BaseQuery,
-    SignallingSession as BaseSession,
-    SQLAlchemy as BaseSQLAlchemy,
-)
+from flask_sqlalchemy import SQLAlchemy as BaseSQLAlchemy
+from flask_sqlalchemy.model import Model as BaseModel
+from flask_sqlalchemy.query import Query as BaseQuery
+from flask_sqlalchemy.session import Session as BaseSession
+
 from sqlalchemy import orm
 
 from .models import (
